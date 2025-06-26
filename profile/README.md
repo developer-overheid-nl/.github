@@ -3,7 +3,7 @@
 <p align="center">
   <br>
     <a href="https://developer.overheid.nl" target="_blank">
-      <img width="500" src="logo.png" alt="logo van developer.overheid.nl">
+      <img width="400" src="logo.png" alt="logo van developer.overheid.nl">
     </a>
   <br>
 </p>
@@ -20,7 +20,8 @@
 [👔 LinkedIn](https://www.linkedin.com/company/92926607)  •&nbsp;
 [📨 Schiet een issue in](https://github.com/developer-overheid-nl/don-site/issues) •&nbsp;
 [🔀 Github Discussions](https://github.com/orgs/developer-overheid-nl/discussions)  •&nbsp;
-[📜 Bijdragen ](https://developer.overheid.nl/contributing)
+[📜 Bijdragen ](https://developer.overheid.nl/contributing) •&nbsp;
+[🏗️ Ondersteuning ](https://developer.overheid.nl/implementatie-ondersteuning)
 
 ## 📰 Developer.overheid.nl
 Dit zijn onze deelproducten:
