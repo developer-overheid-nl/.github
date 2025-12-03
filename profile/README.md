@@ -3,7 +3,7 @@
 <p align="center">
   <br>
     <a href="https://developer.overheid.nl" target="_blank">
-      <img width="400" src="logo.png" alt="logo van developer.overheid.nl">
+      <img width="400" src="logo.svg" alt="logo van developer.overheid.nl">
     </a>
   <br>
 </p>
