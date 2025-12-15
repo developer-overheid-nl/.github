@@ -34,14 +34,14 @@ Dit zijn onze deelproducten:
 
   Voor opinie, updates en eventverslagen.
 
-- [📇 API Register](https://gitlab.com/commonground/don/developer.overheid.nl)
+- [📇 API Register](https://apis.developer.overheid.nl)
 
   Zoek, vind en gebruik API's vanuit de Nederlandse publieke sector.
 
   - [API](https://github.com/developer-overheid-nl/don-api-register)
   - [Front-end](https://github.com/developer-overheid-nl/don-register-site) (gedeelde codebase OSS Register)
 
-- [🏛️ Open Source Register](https://gitlab.com/commonground/don/developer.overheid.nl)
+- [🏛️ Open Source Register](https://oss.developer.overheid.nl)
 
   Zoek, vind en gebruik open source projecten vanuit de Nederlandse publieke sector.
 
