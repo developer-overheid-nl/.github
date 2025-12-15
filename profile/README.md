@@ -38,15 +38,15 @@ Dit zijn onze deelproducten:
 
   Zoek, vind en gebruik API's vanuit de Nederlandse publieke sector.
 
-  - [API API](https://github.com/developer-overheid-nl/don-api-register)
-  - [Op basis van Register front-end](https://github.com/developer-overheid-nl/don-register-site) (1 codebase gedeeld met OSS Register)
+  - [API](https://github.com/developer-overheid-nl/don-api-register)
+  - [Front-end](https://github.com/developer-overheid-nl/don-register-site) (gedeelde codebase OSS Register)
 
 - [🏛️ Open Source Register](https://gitlab.com/commonground/don/developer.overheid.nl)
 
   Zoek, vind en gebruik open source projecten vanuit de Nederlandse publieke sector.
 
-  - [OSS API](https://github.com/developer-overheid-nl/don-oss-register)
-  - [Op basis van Register front-end](https://github.com/developer-overheid-nl/don-register-site) (1 codebase gedeeld met API Register)
+  - [API](https://github.com/developer-overheid-nl/don-oss-register)
+  - [Front-end](https://github.com/developer-overheid-nl/don-register-site) (gedeelde codebase API Register)
 
 
 ## 🔌 API's
