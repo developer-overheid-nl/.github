@@ -28,19 +28,25 @@ Dit zijn onze deelproducten:
 
 - [📚 Kennisbank](https://github.com/developer-overheid-nl/don-site/tree/main/docs)
 
-  Alle informatie die je nodig hebt bij je dagelijkse werk als developer
+  Alle informatie die je nodig hebt bij je dagelijkse werk als developer.
 
 - [✍️ Blog](https://github.com/developer-overheid-nl/don-site/tree/main/blog)
 
-  Voor opinie, updates en eventverslagen
+  Voor opinie, updates en eventverslagen.
 
 - [📇 API Register](https://gitlab.com/commonground/don/developer.overheid.nl)
 
-  Zoek, vind en gebruik API's vanuit de Nederlandse publieke sector
+  Zoek, vind en gebruik API's vanuit de Nederlandse publieke sector.
+
+  - [API API](https://github.com/developer-overheid-nl/don-api-register)
+  - [Op basis van Register front-end](https://github.com/developer-overheid-nl/don-register-site) (1 codebase gedeeld met OSS Register)
 
 - [🏛️ Open Source Register](https://gitlab.com/commonground/don/developer.overheid.nl)
 
-  Zoek, vind en gebruik open source projecten vanuit de Nederlandse publieke sector
+  Zoek, vind en gebruik open source projecten vanuit de Nederlandse publieke sector.
+
+  - [OSS API](https://github.com/developer-overheid-nl/don-oss-register)
+  - [Op basis van Register front-end](https://github.com/developer-overheid-nl/don-register-site) (1 codebase gedeeld met API Register)
 
 
 ## 🔌 API's
@@ -48,11 +54,11 @@ Meer projecten over API's:
 
 - [Kennisbank over API's](https://github.com/developer-overheid-nl/don-site/blob/main/docs/apis/index.mdx)
 
-  Ons hoofdstuk in de kennisbank over API's
+  Ons hoofdstuk in de kennisbank over API's.
 
 - [API Design Rules Linter](https://github.com/developer-overheid-nl/oas-checker)
 
-  De ADR Linter controleert of een OpenAPI Specificatie compliant is met de API Design Rules
+  De ADR Linter controleert of een OpenAPI Specificatie compliant is met de API Design Rules.
 
 - [API Design Rules Validator](https://gitlab.com/commonground/don/adr-validator)
 
@@ -75,4 +81,4 @@ Meer projecten over open source:
 
 - [Kennisbank over open source](https://github.com/developer-overheid-nl/don-site/blob/main/docs/open-source/index.mdx)
 
-  Ons hoofdstuk in de kennisbank over open source
+  Ons hoofdstuk in de kennisbank over open source.
