@@ -3,7 +3,7 @@
 <p align="center">
   <br>
     <a href="https://developer.overheid.nl" target="_blank">
-      <img width="400" src="logo.svg" alt="logo van developer.overheid.nl">
+      <img width="100%" src="GithubProfile.svg" alt="Banner van developer.overheid.nl: een bureau met scherm uitkijkend over een Nederlands landschap met molen">
     </a>
   <br>
 </p>
