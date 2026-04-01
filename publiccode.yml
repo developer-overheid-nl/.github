@@ -1,0 +1,51 @@
+# This repository adheres to the publiccode.yml standard by including this
+# metadata file that makes public software easily discoverable.
+# More info at https://github.com/publiccodeyml/publiccode.yml
+
+publiccodeYmlVersion: "0.5"
+
+name: Developer Overheid NL Community Profile
+url: https://github.com/developer-overheid-nl/.github
+landingURL: https://developer.overheid.nl
+
+softwareType: configurationFiles
+
+platforms:
+  - web
+
+developmentStatus: stable
+
+description:
+  nl:
+    shortDescription: >-
+      Overzicht van projecten van de developer community van de Nederlandse overheid.
+    longDescription: >
+      Dit repository bevat het community-profiel en de gezondheidsdocumentatie
+      voor de developer community van de Nederlandse overheid. Het biedt een
+      overzicht van de deelproducten van developer.overheid.nl, waaronder de
+      kennisbank, het API Register en het Open Source Register.
+    features:
+      - Community profiel voor de Nederlandse overheid developer community
+      - Overzicht van alle deelproducten van developer.overheid.nl
+
+legal:
+  license: EUPL-1.2
+  mainCopyrightOwner: Stichting Geonovum
+
+intendedAudience:
+  countries:
+    - NL
+  scope:
+    - government
+
+localisation:
+  availableLanguages:
+    - nl
+  localisationReady: false
+
+maintenance:
+  type: internal
+  contacts:
+    - name: developer.overheid.nl
+      affiliation: Stichting Geonovum
+      email: developer.overheid@geonovum.nl
