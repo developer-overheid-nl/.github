@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Houdt de actions in de gedeelde workflows up-to-date. Na een merge rol je
+  # de update uit door de tag v1 te verplaatsen (zie .github/workflows/README.md).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"

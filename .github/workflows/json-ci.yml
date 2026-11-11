@@ -1,0 +1,41 @@
+name: JSON CI
+
+# Herbruikbare JSON-lint en OpenAPI-validatie met Super-Linter.
+
+on:
+  workflow_call:
+    inputs:
+      filter-regex-exclude:
+        description: "Bestanden die Super-Linter overslaat"
+        required: false
+        type: string
+        default: "(^|.*/)\\.vscode/|(^|.*/)tsconfig(\\..+)?\\.json$"
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-validate:
+    name: JSON Lint & OpenAPI Validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run Super-Linter
+        # v8.7.0 bundelt Spectral 6.16.0, dat crasht op bestaande OpenAPI-schema's.
+        uses: super-linter/super-linter@9e863354e3ff62e0727d37183162c4a88873df41 # v8.6.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_ALL_CODEBASE: true
+          FILTER_REGEX_EXCLUDE: ${{ inputs.filter-regex-exclude }}
+          VALIDATE_JSON: true
+          VALIDATE_OPENAPI: true
+          ENABLE_GITHUB_PULL_REQUEST_SUMMARY_COMMENT: true
+          UPDATE_EXISTING_GITHUB_PULL_REQUEST_SUMMARY_COMMENT: true
