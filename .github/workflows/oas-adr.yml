@@ -1,0 +1,59 @@
+name: OAS ADR validation
+
+# Herbruikbare validatie van een OpenAPI-document tegen de DON ADR-ruleset.
+
+on:
+  workflow_call:
+    inputs:
+      openapi-file:
+        description: "Pad naar het OpenAPI-document"
+        required: false
+        type: string
+        default: api/openapi.json
+      adr-version:
+        required: false
+        type: string
+        default: 2.2.0
+      don-checker-version:
+        required: false
+        type: string
+        default: 1.3.1
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate OpenAPI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Update npm
+        run: npm install --global npm@11.12.1
+
+      # Globaal installeren: npx zou don-checker tegen de package-lock.json van de
+      # repo resolven (waar hij een transitieve dependency van kan zijn) en falen.
+      - name: Install DON Checker
+        env:
+          VERSION: ${{ inputs.don-checker-version }}
+        run: npm install --global "@developer-overheid-nl/don-checker@$VERSION"
+
+      - name: Validate OpenAPI against DON ADR
+        env:
+          OPENAPI_FILE: ${{ inputs.openapi-file }}
+          ADR_VERSION: ${{ inputs.adr-version }}
+        run: |
+          don-checker validate \
+            --standard adr \
+            --version "$ADR_VERSION" \
+            --input "$OPENAPI_FILE" \
+            --format table \
+            --fail-on error

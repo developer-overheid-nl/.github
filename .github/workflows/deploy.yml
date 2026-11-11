@@ -1,0 +1,402 @@
+name: Deploy
+
+# Herbruikbare deploy-workflow voor de DON-apps.
+#
+# - environment: test → bouwt `<image>:test` en `<image>:test-<sha>` en zet de
+#   test-overlay in de infra-repo direct op `test-<sha>`. Alleen bij handmatige
+#   start of als de commit-message het deploy-keyword bevat.
+# - environment: prod → bouwt `<image>:latest` en `<image>:<sha>` en maakt of
+#   werkt de release-PR `release/<repo>` in de infra-repo bij.
+#
+# Test-images krijgen bewust een eigen tag-prefix: een test-build mag nooit de
+# `<sha>`-tag overschrijven die productie deployt.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "test of prod"
+        required: true
+        type: string
+      infra-repo:
+        description: "Infra-repository in de vorm owner/repo (meestal vars.INFRA_REPO)"
+        required: true
+        type: string
+      kustomize-path:
+        description: "Pad naar de overlays in de infra-repo, bijv. apps/frontend/overlays/ (meestal vars.KUSTOMIZE_PATH)"
+        required: false
+        type: string
+        default: ""
+      images:
+        description: >-
+          JSON-lijst met images: [{"name": "ghcr.io/org/app", "target": "runtime", "kustomize-path": "apps/x/overlays/"}].
+          target en kustomize-path zijn optioneel. Standaard één image ghcr.io/<repository>.
+        required: false
+        type: string
+        default: ""
+      build:
+        description: "Bouw en push de images. Zet op false als de images al elders zijn gebouwd."
+        required: false
+        type: boolean
+        default: true
+      sha:
+        description: "Commit-sha voor de image-tag. Standaard github.sha."
+        required: false
+        type: string
+        default: ""
+      context:
+        description: "Docker build context"
+        required: false
+        type: string
+        default: "."
+      build-args:
+        description: "Docker build-args, één per regel"
+        required: false
+        type: string
+        default: ""
+      deploy-keyword:
+        description: "Keyword in de commit-message dat een test-deploy start"
+        required: false
+        type: string
+        default: "[deploy-test]"
+    secrets:
+      RELEASE_PROCES_APP_ID:
+        required: true
+      RELEASE_PROCES_APP_PRIVATE_KEY:
+        required: true
+      BUILD_SECRETS:
+        description: "Docker build-secrets, één per regel in de vorm \"ID=waarde\""
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Bepaal deploy
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.check.outputs.deploy }}
+      tag: ${{ steps.check.outputs.tag }}
+      floating-tag: ${{ steps.check.outputs.floating-tag }}
+      images: ${{ steps.images.outputs.images }}
+    steps:
+      - name: Controleer trigger
+        id: check
+        env:
+          DEPLOY_ENV: ${{ inputs.environment }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          KEYWORD: ${{ inputs.deploy-keyword }}
+          SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          set -euo pipefail
+
+          case "$DEPLOY_ENV" in
+            prod)
+              echo "deploy=true" >> "$GITHUB_OUTPUT"
+              echo "tag=$SHA" >> "$GITHUB_OUTPUT"
+              echo "floating-tag=latest" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            test) ;;
+            *)
+              echo "environment moet test of prod zijn, huidige waarde: '$DEPLOY_ENV'" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "tag=test-$SHA" >> "$GITHUB_OUTPUT"
+          echo "floating-tag=test" >> "$GITHUB_OUTPUT"
+
+          # Changesets pusht main-commits naar deze branches, met dezelfde sha en
+          # commit-message. Die mogen nooit een test-deploy starten.
+          if [[ "$REF_NAME" == "main" || "$REF_NAME" == changeset-release/* || "$REF_NAME" == changesets-ghcommit-temp/* ]]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Geen test-deploy vanaf branch $REF_NAME."
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "Handmatige trigger, deploy wordt uitgevoerd."
+          elif grep -Fqi -- "$KEYWORD" <<< "$COMMIT_MESSAGE"; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "Deploy-keyword gevonden in de commit-message."
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Gebruik $KEYWORD in de commit-message of start de workflow handmatig."
+          fi
+
+      - name: Bepaal images
+        id: images
+        env:
+          IMAGES: ${{ inputs.images }}
+          DEFAULT_IMAGE: ghcr.io/${{ github.repository }}
+          KUSTOMIZE_PATH: ${{ inputs.kustomize-path }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$IMAGES" ]]; then
+            IMAGES="$(jq -cn --arg name "$DEFAULT_IMAGE" '[{name: $name}]')"
+          fi
+
+          IMAGES="$(jq -c --arg path "$KUSTOMIZE_PATH" '
+            map({
+              name: (.name | ascii_downcase),
+              target: (.target // ""),
+              "kustomize-path": (.["kustomize-path"] // $path)
+            })' <<< "$IMAGES")"
+
+          if jq -e 'length == 0 or any(.[]; .name == "" or .["kustomize-path"] == "")' <<< "$IMAGES" > /dev/null; then
+            echo "Elke image heeft een name en een kustomize-path nodig: $IMAGES" >&2
+            exit 1
+          fi
+
+          echo "images=$IMAGES" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.image.name }}
+    needs: prepare
+    if: needs.prepare.outputs.deploy == 'true' && inputs.build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        image: ${{ fromJSON(needs.prepare.outputs.images) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      - name: Login to container registry
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: ${{ inputs.context }}
+          target: ${{ matrix.image.target }}
+          push: true
+          build-args: ${{ inputs.build-args }}
+          secrets: ${{ secrets.BUILD_SECRETS }}
+          tags: |
+            ${{ matrix.image.name }}:${{ needs.prepare.outputs.floating-tag }}
+            ${{ matrix.image.name }}:${{ needs.prepare.outputs.tag }}
+
+  infra:
+    name: Update ${{ inputs.environment }}-overlay
+    needs: [prepare, build]
+    if: >-
+      always()
+      && needs.prepare.outputs.deploy == 'true'
+      && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-${{ github.repository }}-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      DEPLOY_ENV: ${{ inputs.environment }}
+      INFRA_REPO: ${{ inputs.infra-repo }}
+      IMAGES: ${{ needs.prepare.outputs.images }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      SHA: ${{ inputs.sha || github.sha }}
+      SOURCE_REPO: ${{ github.event.repository.name }}
+      COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ inputs.sha || github.sha }}
+    steps:
+      - name: Controleer infra-configuratie
+        id: infra-repo
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$INFRA_REPO" || "$INFRA_REPO" != */* ]]; then
+            echo "infra-repo moet de vorm owner/repo hebben, huidige waarde: '$INFRA_REPO'" >&2
+            exit 1
+          fi
+
+          echo "owner=${INFRA_REPO%%/*}" >> "$GITHUB_OUTPUT"
+          echo "repo=${INFRA_REPO#*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Genereer app-token (Release proces app)
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.RELEASE_PROCES_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PROCES_APP_PRIVATE_KEY }}
+          owner: ${{ steps.infra-repo.outputs.owner }}
+          repositories: ${{ steps.infra-repo.outputs.repo }}
+
+      - name: Checkout infra-repo
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          repository: ${{ inputs.infra-repo }}
+          token: ${{ steps.app-token.outputs.token }}
+          ref: main
+          fetch-depth: 0
+
+      - name: Maak release-branch
+        id: branch
+        if: inputs.environment == 'prod'
+        run: |
+          set -euo pipefail
+
+          BRANCH="release/$SOURCE_REPO"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          git checkout -B "$BRANCH"
+
+      - name: Zet image-tags in de overlays
+        run: |
+          set -euo pipefail
+
+          : > "$RUNNER_TEMP/kustomizations"
+          while IFS=$'\t' read -r IMAGE_NAME KUSTOMIZE_PATH; do
+            KUSTOMIZATION_FILE="${KUSTOMIZE_PATH%/}/${DEPLOY_ENV}/kustomization.yaml"
+
+            if [[ ! -f "$KUSTOMIZATION_FILE" ]]; then
+              echo "Kustomization niet gevonden: $KUSTOMIZATION_FILE" >&2
+              exit 1
+            fi
+
+            export IMAGE_NAME
+            if ! yq e '.images[] | select(.newName == strenv(IMAGE_NAME)) | .newName' "$KUSTOMIZATION_FILE" | grep -Fxq "$IMAGE_NAME"; then
+              echo "Image $IMAGE_NAME staat niet in $KUSTOMIZATION_FILE." >&2
+              exit 1
+            fi
+
+            yq e '(.images[] | select(.newName == strenv(IMAGE_NAME))).newTag = strenv(TAG)' -i "$KUSTOMIZATION_FILE"
+            echo "$KUSTOMIZATION_FILE" >> "$RUNNER_TEMP/kustomizations"
+          done < <(jq -r '.[] | [.name, .["kustomize-path"]] | @tsv' <<< "$IMAGES")
+
+      - name: Commit
+        id: commit
+        run: |
+          set -euo pipefail
+
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          xargs git add < "$RUNNER_TEMP/kustomizations"
+
+          if git diff --cached --quiet; then
+            echo "De $DEPLOY_ENV-overlay gebruikt deze image al."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$DEPLOY_ENV" == "prod" ]]; then
+            SUBJECT="release: $SOURCE_REPO → $SHA"
+          else
+            SUBJECT="test: $SOURCE_REPO → $SHA"
+          fi
+
+          git commit -m "$SUBJECT" -m "Branch: ${{ github.ref_name }}
+          Commit: $COMMIT_URL"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push naar main (test)
+        if: inputs.environment == 'test' && steps.commit.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+
+          # Andere repo's pushen ook naar main van de infra-repo; probeer opnieuw na een rebase.
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            echo "Push mislukt (poging $attempt), opnieuw proberen..."
+            sleep $((attempt * 5))
+          done
+          echo "Push naar main van $INFRA_REPO is na 5 pogingen mislukt." >&2
+          exit 1
+
+      - name: Push release-branch (prod)
+        if: inputs.environment == 'prod' && steps.commit.outputs.changed == 'true'
+        run: git push origin "${{ steps.branch.outputs.branch }}" --force
+
+      - name: Maak of update release-PR
+        id: pr
+        if: inputs.environment == 'prod' && steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          TITLE="Release: $SOURCE_REPO → ${SHA::7}"
+          IMAGE_LINES="$(jq -r --arg tag "$TAG" '.[] | "- \(.name):\($tag)"' <<< "$IMAGES")"
+          BODY="## $SOURCE_REPO productie deploy
+
+          **Images:**
+          $IMAGE_LINES
+
+          **Branch:** $REF_NAME
+          **Commit:** $COMMIT_URL
+
+          Merge deze PR om de nieuwe versie naar productie te deployen."
+
+          PR_NUMBER="$(gh pr list \
+            --repo "$INFRA_REPO" \
+            --state open \
+            --head "$BRANCH" \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [[ -n "$PR_NUMBER" ]]; then
+            gh pr edit "$PR_NUMBER" --repo "$INFRA_REPO" --title "$TITLE" --body "$BODY"
+          else
+            PR_URL="$(gh pr create \
+              --repo "$INFRA_REPO" \
+              --base main \
+              --head "$BRANCH" \
+              --title "$TITLE" \
+              --body "$BODY")"
+            PR_NUMBER="${PR_URL##*/}"
+          fi
+
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Release-PR: https://github.com/$INFRA_REPO/pull/$PR_NUMBER" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sluit oudere release-PR's van deze repo
+        if: inputs.environment == 'prod' && steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          CURRENT: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t STALE_PRS < <(
+            gh pr list \
+              --repo "$INFRA_REPO" \
+              --state open \
+              --limit 100 \
+              --json number,title,headRefName \
+            | jq -r \
+                --arg branch "$BRANCH" \
+                --arg prefix "$BRANCH-" \
+                --arg title_prefix "Release: $SOURCE_REPO → " \
+                --argjson current "$CURRENT" '
+                  .[]
+                  | select(.number != $current)
+                  | select(
+                      .headRefName == $branch
+                      or (.headRefName | startswith($prefix))
+                      or (.title | startswith($title_prefix))
+                    )
+                  | .number
+                '
+          )
+
+          for pr in "${STALE_PRS[@]}"; do
+            [[ -z "$pr" ]] && continue
+            gh pr close "$pr" \
+              --repo "$INFRA_REPO" \
+              --comment "Gesloten omdat deze release is vervangen door #$CURRENT."
+          done
