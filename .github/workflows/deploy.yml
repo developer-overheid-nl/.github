@@ -59,11 +59,14 @@ on:
         required: false
         type: string
         default: "[deploy-test]"
+    # Niet verplicht: Dependabot-runs krijgen geen Actions-secrets. Met required: true
+    # faalt de aanroep dan al voordat de workflow kan besluiten dat er niets te deployen
+    # valt. De infra-job controleert zelf of ze er zijn.
     secrets:
       RELEASE_PROCES_APP_ID:
-        required: true
+        required: false
       RELEASE_PROCES_APP_PRIVATE_KEY:
-        required: true
+        required: false
       BUILD_SECRETS:
         description: "Docker build-secrets, één per regel in de vorm \"ID=waarde\""
         required: false
@@ -111,8 +114,9 @@ jobs:
           echo "floating-tag=test" >> "$GITHUB_OUTPUT"
 
           # Changesets pusht main-commits naar deze branches, met dezelfde sha en
-          # commit-message. Die mogen nooit een test-deploy starten.
-          if [[ "$REF_NAME" == "main" || "$REF_NAME" == changeset-release/* || "$REF_NAME" == changesets-ghcommit-temp/* ]]; then
+          # commit-message. Die mogen nooit een test-deploy starten, net als
+          # Dependabot-branches (die hebben geen secrets).
+          if [[ "$REF_NAME" == "main" || "$REF_NAME" == changeset-release/* || "$REF_NAME" == changesets-ghcommit-temp/* || "$REF_NAME" == dependabot/* ]]; then
             echo "deploy=false" >> "$GITHUB_OUTPUT"
             echo "Geen test-deploy vanaf branch $REF_NAME."
           elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
@@ -215,8 +219,16 @@ jobs:
     steps:
       - name: Controleer infra-configuratie
         id: infra-repo
+        env:
+          HAS_APP_ID: ${{ secrets.RELEASE_PROCES_APP_ID != '' }}
+          HAS_APP_KEY: ${{ secrets.RELEASE_PROCES_APP_PRIVATE_KEY != '' }}
         run: |
           set -euo pipefail
+
+          if [[ "$HAS_APP_ID" != "true" || "$HAS_APP_KEY" != "true" ]]; then
+            echo "RELEASE_PROCES_APP_ID en RELEASE_PROCES_APP_PRIVATE_KEY zijn nodig voor een deploy (gebruik secrets: inherit)." >&2
+            exit 1
+          fi
 
           if [[ -z "$INFRA_REPO" || "$INFRA_REPO" != */* ]]; then
             echo "infra-repo moet de vorm owner/repo hebben, huidige waarde: '$INFRA_REPO'" >&2

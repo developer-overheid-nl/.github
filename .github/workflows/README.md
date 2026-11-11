@@ -28,8 +28,8 @@ Bouwt de Docker-image(s) en zet de image-tag in de infra-repository.
 | `prod` | `latest`, `<sha>` | release-PR `release/<repo>`; oudere release-PR's van de repo worden gesloten |
 
 Een test-deploy start bij een handmatige run (`workflow_dispatch`) of als de commit-message
-`[deploy-test]` bevat. Vanaf `main`, `changeset-release/**` en `changesets-ghcommit-temp/**` start nooit
-een test-deploy. Test-images hebben een eigen tag (`test-<sha>`), zodat een test-build nooit de
+`[deploy-test]` bevat. Vanaf `main`, `changeset-release/**`, `changesets-ghcommit-temp/**` en `dependabot/**`
+start nooit een test-deploy. Test-images hebben een eigen tag (`test-<sha>`), zodat een test-build nooit de
 image overschrijft die productie deployt.
 
 ```yaml
@@ -94,7 +94,8 @@ Inputs:
 | `build-args` | `""` | Docker build-args, één per regel |
 | `deploy-keyword` | `[deploy-test]` | keyword voor een test-deploy |
 
-Secrets: `RELEASE_PROCES_APP_ID` en `RELEASE_PROCES_APP_PRIVATE_KEY` zijn verplicht. `BUILD_SECRETS`
+Secrets: `RELEASE_PROCES_APP_ID` en `RELEASE_PROCES_APP_PRIVATE_KEY` zijn nodig voor een deploy. Ze staan niet op
+`required`, omdat Dependabot-runs geen secrets krijgen; de infra-job faalt met een duidelijke melding als ze ontbreken. `BUILD_SECRETS`
 is optioneel en bevat Docker build-secrets, één per regel in de vorm `"ID=waarde"`. Gebruik
 `secrets: inherit`, of geef de secrets expliciet door als je `BUILD_SECRETS` nodig hebt.
 
