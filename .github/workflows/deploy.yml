@@ -351,7 +351,12 @@ jobs:
           **Branch:** $REF_NAME
           **Commit:** $COMMIT_URL
 
-          Merge deze PR om de nieuwe versie naar productie te deployen."
+          Merge deze PR om de nieuwe versie naar productie te deployen.
+
+          > [!IMPORTANT]
+          > Vergeet niet eerst openstaande changelog updates te mergen!
+          > Changeset: Een PR met titel `Version Packages`.
+          "
 
           PR_NUMBER="$(gh pr list \
             --repo "$INFRA_REPO" \
